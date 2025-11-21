@@ -6,6 +6,7 @@ import scipy
 import torchvision
 import torchvision.transforms as transforms
 from torch.utils.data import DataLoader
+from torch.utils.data import random_split
 
 #image_url = "https://www.robots.ox.ac.uk/~vgg/data/flowers/102/102flowers.tgz"
 #labels_url = "https://www.robots.ox.ac.uk/~vgg/data/flowers/102/imagelabels.mat"
@@ -34,6 +35,14 @@ class OxfordFlowersDataset(Dataset):
             image = self.transform(image)
         return image, label
     
+def test_loader(dataset):
+    loader = DataLoader(dataset, batch_size=4, shuffle=True)
+
+    for images, labels in loader:
+        print(f"Success! Batch shape: {images.shape}\n")
+        break
+
+    
 os.makedirs("flower_data", exist_ok=True)
 
 transform = transforms.Compose([
@@ -47,9 +56,24 @@ transform = transforms.Compose([
 dataset = OxfordFlowersDataset("./flower_data", transform=transform)
 print(f"Total samples: {len(dataset)}")
 
-train_data = DataLoader(dataset, batch_size=4, shuffle=True)
+test_loader(dataset);
 
-for images, labels in train_data:
-    print(f"Success! Batch shape: {images.shape}")
-    break
+train_size = int(0.7 * len(dataset))
+val_size = int(0.15 * len(dataset))
+test_size = len(dataset) - train_size - val_size
+
+train_dataset, val_dataset, test_dataset = random_split(
+    dataset, [train_size, val_size, test_size]
+)
+
+print(f"Training: {len(train_dataset)} images")
+print(f"Validation: {len(val_dataset)} images")
+print(f"Test: {len(test_dataset)} images")
+
+batchSize = 32
+train_loader = DataLoader(train_dataset, batchSize, shuffle=True)
+val_loader = DataLoader(val_dataset, batchSize, shuffle=False)
+test_loader = DataLoader(test_dataset, batchSize, shuffle=False)
+
+
 
