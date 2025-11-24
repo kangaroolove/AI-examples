@@ -44,16 +44,20 @@ def test_loader(dataset):
         print(f"Success! Batch shape: {images.shape}\n")
         break
 
-class TransformSubset(Subset):
+class TransformSubset(Dataset):
     def __init__(self, dataset, indices, transform=None):
-        super().__init__(dataset, indices)
         self.transform = transform
+        self.indices = indices
+        self.dataset = dataset
+
+    def __len__(self):
+        return len(self.indices)
 
     def __getitem__(self, idx):
-        img, target = self.dataset[self.indices[idx]]   # get raw PIL Image / tensor
+        img, label = dataset[self.indices[idx]]   # get raw PIL Image / tensor
         if self.transform is not None:
             img = self.transform(img)
-        return img, target
+        return img, label
 
     
 os.makedirs("flower_data", exist_ok=True)
@@ -94,20 +98,28 @@ print(f"Training: {len(train_dataset)} images")
 print(f"Validation: {len(val_dataset)} images")
 print(f"Test: {len(test_dataset)} images")
 
-transformed_train_dataset = TransformSubset(train_dataset, train_dataset.indices, transform=train_transform)
-transformed_valid_dataset = TransformSubset(val_dataset, val_dataset.indices, transform=basic_transform)
-transformed_test_dataset = TransformSubset(test_dataset, test_dataset.indices, transform=basic_transform)
+transformed_train_dataset = TransformSubset(dataset, train_dataset.indices, transform=train_transform)
+transformed_valid_dataset = TransformSubset(dataset, val_dataset.indices, transform=basic_transform)
+transformed_test_dataset = TransformSubset(dataset, test_dataset.indices, transform=basic_transform)
 
-train_loader = DataLoader(transformed_train_dataset, batch_size=32, shuffle=True)
-val_loader = DataLoader(transformed_valid_dataset, batch_size=32, shuffle=False)
-test_loader = DataLoader(transformed_test_dataset, batch_size=32, shuffle=False)
+batch_size = 4
+train_loader = DataLoader(transformed_train_dataset, batch_size=batch_size, shuffle=True)
+val_loader = DataLoader(transformed_valid_dataset, batch_size=batch_size, shuffle=False)
+test_loader = DataLoader(transformed_test_dataset, batch_size=batch_size, shuffle=False)
+
+# Get the first batch
+first_batch = next(iter(train_loader))
+
+# If your dataset returns (data, target)
+images, labels = first_batch
+print(images.shape, labels.shape)
 
 class flowerClassifier(nn.Module):
     def __init__(self):
         super().__init__()
         self.flatten = nn.Flatten()
         self.layers = nn.Sequential(
-            nn.Linear(50176, 128),
+            nn.Linear(150528, 128),
             nn.ReLU(),
             nn.Linear(128, 102)
         )
