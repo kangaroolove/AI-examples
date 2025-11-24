@@ -102,24 +102,19 @@ transformed_train_dataset = TransformSubset(dataset, train_dataset.indices, tran
 transformed_valid_dataset = TransformSubset(dataset, val_dataset.indices, transform=basic_transform)
 transformed_test_dataset = TransformSubset(dataset, test_dataset.indices, transform=basic_transform)
 
-batch_size = 4
+batch_size = 32
 train_loader = DataLoader(transformed_train_dataset, batch_size=batch_size, shuffle=True)
 val_loader = DataLoader(transformed_valid_dataset, batch_size=batch_size, shuffle=False)
 test_loader = DataLoader(transformed_test_dataset, batch_size=batch_size, shuffle=False)
-
-# Get the first batch
-first_batch = next(iter(train_loader))
-
-# If your dataset returns (data, target)
-images, labels = first_batch
-print(images.shape, labels.shape)
 
 class flowerClassifier(nn.Module):
     def __init__(self):
         super().__init__()
         self.flatten = nn.Flatten()
         self.layers = nn.Sequential(
-            nn.Linear(150528, 128),
+            nn.Linear(3 * 224 * 224, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
             nn.ReLU(),
             nn.Linear(128, 102)
         )
@@ -164,7 +159,7 @@ def train_epoch(model, train_loader, loss_function, optimizer, device):
         if batch_idx % 100 == 0 and batch_idx > 0:
             avg_loss = running_loss / 100
             accuracy = 100. * correct / total
-            print(f' [{batch_idx * 64}/6400]Loss:{avg_loss:.3f} | Accuracy: {accuracy:.1f}')
+            print(f' [{batch_idx * 32}/3200]Loss:{avg_loss:.3f} | Accuracy: {accuracy:.1f}')
             running_loss = 0.0
 
 def evaluate(model, test_loader, device):
