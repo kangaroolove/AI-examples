@@ -1,5 +1,8 @@
 # AI-examples
 ## MachineLearning
+### Linear regression
+<img width="979" height="1029" alt="image" src="https://github.com/user-attachments/assets/b5f34db7-b609-492d-82ee-fe04e9b23264" />
+
 
 ## DeepLearning
 ### Linear Neural Network
