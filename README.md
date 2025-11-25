@@ -25,6 +25,14 @@
 #### Result
 <img width="979" height="1029" alt="image" src="https://github.com/user-attachments/assets/58f60670-ea32-4934-987a-aca2bce7b02c" />
 
+### Simple CNN classicification 
+#### Dataset
+<img width="472" height="369" alt="cifar10" src="https://github.com/user-attachments/assets/44f4ae73-a991-43da-98b6-bb528dd3832e" />
+
+#### Result
+<img width="979" height="1029" alt="image" src="https://github.com/user-attachments/assets/0e64ad54-57ab-46d2-95b7-93effc57af76" />
+
+
 
 
 
