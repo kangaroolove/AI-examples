@@ -29,6 +29,8 @@ test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False)
 class MNISTClassifier(nn.Module):
     def __init__(self):
         super().__init__()
+        # Its primary purpose is to convert multi-dimensional data (like an image) 
+        # into a one-dimensional array (a vector) so it can be fed into fully connected (linear) layers
         self.flatten = nn.Flatten()
         self.layers = nn.Sequential(
             nn.Linear(784, 128),
