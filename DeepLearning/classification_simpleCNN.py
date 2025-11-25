@@ -38,54 +38,40 @@ test_dataset = torchvision.datasets.CIFAR10(
 train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
 test_loader = DataLoader(test_dataset, batch_size=1000, shuffle=False)
 
+class ConvBlock(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super().__init__()
+
+        self.block = nn.Sequential(
+            nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+        )
+
+    def forward(self, x):
+        return self.block(x)
+
 class SimpleCNN(nn.Module):
     def __init__(self):
         super(SimpleCNN, self).__init__()
-        # First convolutional layer
-        self.convFirst = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        self.reluFirst = nn.ReLU()
-        self.poolFirst = nn.MaxPool2d(kernel_size=2, stride=2)
 
-        # Second convolutional layer
-        self.convSecond = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.reluSecond = nn.ReLU()
-        self.poolSecond = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.features = nn.Sequential(
+            ConvBlock(3, 32),
+            ConvBlock(32, 64),
+            ConvBlock(64, 128),
+        )
 
-        # Third convolutional layer
-        self.convThird = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
-        self.reluThird = nn.ReLU()
-        self.poolThird = nn.MaxPool2d(kernel_size=2, stride=2)
-
-        # Flatten layer (no parameters, just reshaping)
-        # Full connected layer, 4 = 32 pixel / 2 / 2 / 2since we have three convolutional layers
-        self.fcFirst = nn.Linear(128 * 4 * 4, 512)
-        self.reluFour = nn.ReLU()
-        self.dropout = nn.Dropout(0.5)
-        self.fcSecond = nn.Linear(512, 10)
+        self.classifier = nn.Sequential(
+            nn.Linear(128 * 4 * 4, 512),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(512, 10),
+        )
 
     def forward(self, x) :
-        # First conv block
-        x = self.convFirst(x)
-        x = self.reluFirst(x)
-        x = self.poolFirst(x)
-
-        # Second conv block
-        x = self.convSecond(x)
-        x = self.reluSecond(x)
-        x = self.poolSecond(x)
-
-        # Third conv block
-        x = self.convThird(x)
-        x = self.reluThird(x)
-        x = self.poolThird(x)
-
+        x = self.features(x)
         x = x.flatten(1)
-
-        # Fully connected layer
-        x = self.fcFirst(x)
-        x = self.reluFour(x)
-        x = self.dropout(x)
-        x = self.fcSecond(x)
+        x = self.classifier(x)
         return x
     
     
