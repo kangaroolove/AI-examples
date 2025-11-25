@@ -44,7 +44,7 @@ def test_loader(dataset):
         print(f"Success! Batch shape: {images.shape}\n")
         break
 
-class TransformSubset(Dataset):
+class TransformDataset(Dataset):
     def __init__(self, dataset, indices, transform=None):
         self.transform = transform
         self.indices = indices
@@ -86,25 +86,21 @@ basic_transform = transforms.Compose([
 dataset = OxfordFlowersDataset("./flower_data", transform=None)
 print(f"Total samples: {len(dataset)}")
 
-train_size = int(0.7 * len(dataset))
-val_size = int(0.15 * len(dataset))
-test_size = len(dataset) - train_size - val_size
+train_size = int(0.8 * len(dataset))
+test_size = len(dataset) - train_size
 
-train_dataset, val_dataset, test_dataset = random_split(
-    dataset, [train_size, val_size, test_size]
+train_dataset, test_dataset = random_split(
+    dataset, [train_size, test_size]
 )
 
 print(f"Training: {len(train_dataset)} images")
-print(f"Validation: {len(val_dataset)} images")
 print(f"Test: {len(test_dataset)} images")
 
-transformed_train_dataset = TransformSubset(dataset, train_dataset.indices, transform=train_transform)
-transformed_valid_dataset = TransformSubset(dataset, val_dataset.indices, transform=basic_transform)
-transformed_test_dataset = TransformSubset(dataset, test_dataset.indices, transform=basic_transform)
+transformed_train_dataset = TransformDataset(dataset, train_dataset.indices, transform=train_transform)
+transformed_test_dataset = TransformDataset(dataset, test_dataset.indices, transform=basic_transform)
 
 batch_size = 32
 train_loader = DataLoader(transformed_train_dataset, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(transformed_valid_dataset, batch_size=batch_size, shuffle=False)
 test_loader = DataLoader(transformed_test_dataset, batch_size=batch_size, shuffle=False)
 
 class flowerClassifier(nn.Module):
