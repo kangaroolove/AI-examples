@@ -3,6 +3,9 @@
 ### Linear regression
 <img width="979" height="1029" alt="image" src="https://github.com/user-attachments/assets/b5f34db7-b609-492d-82ee-fe04e9b23264" />
 
+### Logistic regression
+<img width="979" height="1029" alt="image" src="https://github.com/user-attachments/assets/9569b5de-0a2f-4c5e-875a-84a99018782b" />
+
 
 ## DeepLearning
 ### Linear Neural Network
