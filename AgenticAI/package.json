@@ -1,0 +1,20 @@
+{
+  "name": "agentic-ai",
+  "version": "1.0.0",
+  "description": "TypeScript CLI agent with Ollama and Notepad skills",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^12.1.0",
+    "openai": "^4.68.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}
