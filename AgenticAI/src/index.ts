@@ -25,7 +25,7 @@ async function main(): Promise<void> {
   program
     .name('agentic-ai')
     .description('TypeScript CLI agent with Ollama and Notepad skills')
-    .option('-m, --model <model>', 'Ollama model to use', 'llama3.2')
+    .option('-m, --model <model>', 'Ollama model to use', 'gpt-oss:120b-cloud')
     .option('-u, --url <url>', 'Ollama base URL', 'http://localhost:11434/v1')
     .option('-t, --temperature <number>', 'Sampling temperature', parseFloat, 0.7)
     .option('-k, --api-key <key>', 'API key (ignored by Ollama)', 'ollama')
