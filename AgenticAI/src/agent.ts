@@ -1,8 +1,8 @@
 import OpenAI from 'openai';
 import type { CLIConfig, MessageHistory } from './types';
-import { getOpenAITools, executeSkill } from './skills/index';
+import { planTask, executeWorkflow } from './workflow';
 
-const MAX_TOOL_ITERATIONS = 10;
+const NOTEPAD_KEYWORD = /notepad/i;
 
 export async function checkOllamaConnection(client: OpenAI): Promise<void> {
   try {
@@ -17,65 +17,58 @@ export async function checkOllamaConnection(client: OpenAI): Promise<void> {
   }
 }
 
-const NOTEPAD_KEYWORD = /notepad/i;
-
 export async function runAgentTurn(
   client: OpenAI,
   config: CLIConfig,
   history: MessageHistory,
-  userMessage: string
+  userMessage: string,
+  onProgress?: (message: string) => void
 ): Promise<string> {
   history.push({ role: 'user', content: userMessage });
 
-  // Only provide tools when the user's message explicitly mentions Notepad.
-  // This prevents small models (llama3.2) from calling tools unprompted.
-  const needsTools = NOTEPAD_KEYWORD.test(userMessage);
-  const tools = needsTools ? getOpenAITools() : undefined;
-  let iterations = 0;
+  // ── Workflow path: Notepad task ──────────────────────────────────────────
+  if (NOTEPAD_KEYWORD.test(userMessage)) {
+    onProgress?.('Discovering relevant skills...');
 
-  while (iterations < MAX_TOOL_ITERATIONS) {
-    iterations++;
+    let plan;
+    try {
+      plan = await planTask(client, config, userMessage);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      const response = `Could not create a plan: ${msg}`;
+      history.push({ role: 'assistant', content: response });
+      return response;
+    }
 
-    const response = await client.chat.completions.create({
-      model: config.model,
-      messages: history,
-      ...(tools ? { tools, tool_choice: 'auto' } : {}),
-      temperature: config.temperature,
+    onProgress?.(`Goal: ${plan.goal}`);
+    onProgress?.(`Plan: ${plan.steps.map((s) => s.skill).join(' → ')}`);
+
+    const results = await executeWorkflow(plan, (i, total, step) => {
+      onProgress?.(`[${i + 1}/${total}] ${step.skill} — ${step.reason}`);
     });
 
-    const choice = response.choices[0];
-    if (!choice) {
-      throw new Error('No response from model');
-    }
+    const allOk = results.every((r) => r.success);
+    const lines = results.map(
+      (r, i) => `  ${i + 1}. ${r.step.skill}: ${r.success ? '✓' : '✗'} ${r.output}`
+    );
 
-    const assistantMessage = choice.message;
-    history.push(assistantMessage);
+    const finalResponse = allOk
+      ? `Done! ${plan.goal}\n\n${lines.join('\n')}`
+      : `Workflow stopped early.\n\n${lines.join('\n')}`;
 
-    if (choice.finish_reason === 'tool_calls' && assistantMessage.tool_calls) {
-      for (const toolCall of assistantMessage.tool_calls) {
-        const fnName = toolCall.function.name;
-        let fnArgs: Record<string, unknown> = {};
-        try {
-          fnArgs = JSON.parse(toolCall.function.arguments) as Record<string, unknown>;
-        } catch {
-          fnArgs = {};
-        }
-
-        const resultContent = await executeSkill(fnName, fnArgs);
-
-        history.push({
-          role: 'tool',
-          tool_call_id: toolCall.id,
-          content: resultContent,
-        });
-      }
-      // Continue loop to get the model's next response after tool results
-      continue;
-    }
-
-    // finish_reason === 'stop' or other terminal reason
-    return assistantMessage.content ?? '';
+    history.push({ role: 'assistant', content: finalResponse });
+    return finalResponse;
   }
 
-  return 'Maximum tool iterations reached. The agent stopped to prevent an infinite loop.';
+  // ── Plain chat path ──────────────────────────────────────────────────────
+  const response = await client.chat.completions.create({
+    model: config.model,
+    messages: history,
+    temperature: config.temperature,
+  });
+
+  const assistantMessage = response.choices[0]?.message;
+  if (!assistantMessage) throw new Error('No response from model');
+  history.push(assistantMessage);
+  return assistantMessage.content ?? '';
 }

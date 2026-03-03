@@ -25,6 +25,19 @@ export function getSkillNames(): string[] {
   return SKILL_REGISTRY.map((s) => s.name);
 }
 
+export function getSkillDescriptions(): string {
+  return SKILL_REGISTRY.map((skill) => {
+    const props = skill.parameters.properties;
+    const params = Object.entries(props)
+      .map(([k, v]) => {
+        const optional = !skill.parameters.required.includes(k) ? '?' : '';
+        return `${k}${optional}: ${v.type}`;
+      })
+      .join(', ');
+    return `- ${skill.name}(${params})\n  ${skill.description}`;
+  }).join('\n');
+}
+
 export async function executeSkill(name: string, args: Record<string, unknown>): Promise<string> {
   const skill = SKILL_REGISTRY.find((s) => s.name === name);
   if (!skill) {

@@ -96,12 +96,21 @@ async function main(): Promise<void> {
       }
 
       try {
+        const CLEAR = ' '.repeat(60) + '\r';
         process.stdout.write(chalk.gray('Thinking...\r'));
-        const response = await runAgentTurn(client, config, history, trimmed);
-        process.stdout.write('             \r'); // clear "Thinking..."
+
+        const response = await runAgentTurn(
+          client, config, history, trimmed,
+          (msg) => {
+            process.stdout.write(CLEAR);
+            console.log(chalk.dim(`  > ${msg}`));
+          }
+        );
+
+        process.stdout.write(CLEAR);
         console.log(chalk.green('AI: ') + response + '\n');
       } catch (err) {
-        process.stdout.write('             \r');
+        process.stdout.write(' '.repeat(60) + '\r');
         const message = err instanceof Error ? err.message : String(err);
         console.error(chalk.red(`Error: ${message}\n`));
       }
