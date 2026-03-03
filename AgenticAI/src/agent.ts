@@ -17,6 +17,8 @@ export async function checkOllamaConnection(client: OpenAI): Promise<void> {
   }
 }
 
+const NOTEPAD_KEYWORD = /notepad/i;
+
 export async function runAgentTurn(
   client: OpenAI,
   config: CLIConfig,
@@ -25,7 +27,10 @@ export async function runAgentTurn(
 ): Promise<string> {
   history.push({ role: 'user', content: userMessage });
 
-  const tools = getOpenAITools();
+  // Only provide tools when the user's message explicitly mentions Notepad.
+  // This prevents small models (llama3.2) from calling tools unprompted.
+  const needsTools = NOTEPAD_KEYWORD.test(userMessage);
+  const tools = needsTools ? getOpenAITools() : undefined;
   let iterations = 0;
 
   while (iterations < MAX_TOOL_ITERATIONS) {
@@ -34,8 +39,7 @@ export async function runAgentTurn(
     const response = await client.chat.completions.create({
       model: config.model,
       messages: history,
-      tools,
-      tool_choice: 'auto',
+      ...(tools ? { tools, tool_choice: 'auto' } : {}),
       temperature: config.temperature,
     });
 

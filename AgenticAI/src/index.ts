@@ -6,17 +6,18 @@ import { checkOllamaConnection, runAgentTurn } from './agent';
 import { getSkillNames } from './skills/index';
 import type { CLIConfig, MessageHistory } from './types';
 
-const SYSTEM_PROMPT = `You are a helpful AI assistant with the ability to control Windows Notepad on the user's machine.
+const SYSTEM_PROMPT = `You are a helpful AI assistant. Always reply directly in this chat.
 
-You have the following skills available:
-- open_notepad: Open Notepad, optionally with initial content
-- write_notepad: Write (replace) content in the Notepad file
-- save_notepad: Save the Notepad file (sends Ctrl+S)
-- read_notepad: Read the current content of the Notepad file
+CRITICAL RULES — follow these without exception:
+1. NEVER call any tool or skill unless the user's message contains an explicit Notepad instruction such as "open Notepad", "write to Notepad", "save Notepad", or "read Notepad".
+2. For ALL other messages (greetings, questions, general conversation), respond with plain text only. Do NOT call any tool.
+3. If the user says "Hi", "Hello", or asks a question unrelated to Notepad, just answer in text. No tool calls.
 
-When the user asks you to work with Notepad, use these skills to fulfill their request.
-You can chain multiple skill calls in sequence to accomplish complex tasks (e.g., write content then save it).
-Always confirm what you have done after completing the task.`;
+Notepad skills (only invoke when explicitly asked):
+- open_notepad: Open Notepad with optional content
+- write_notepad: Write content to Notepad
+- save_notepad: Save Notepad (Ctrl+S)
+- read_notepad: Read Notepad content`;
 
 async function main(): Promise<void> {
   const program = new Command();
