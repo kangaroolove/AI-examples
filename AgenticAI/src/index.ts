@@ -19,6 +19,54 @@ Notepad skills (only invoke when explicitly asked):
 - save_notepad: Save Notepad (Ctrl+S)
 - read_notepad: Read Notepad content`;
 
+// ── Slash command registry ────────────────────────────────────────────────────
+const SLASH_COMMANDS = [
+  { cmd: '/clear',   desc: 'Reset conversation history' },
+  { cmd: '/help',    desc: 'Show available commands' },
+  { cmd: '/history', desc: 'Show message count in this session' },
+];
+
+// ── Inline hint rendering (shows below cursor when user types "/") ─────────────
+const PROMPT_LEN = 2; // visible length of "> "
+let hintCount = 0;
+
+function clearHints(): void {
+  if (hintCount === 0) return;
+  process.stdout.write('\x1B[s');                   // save cursor (ANSI SCO)
+  for (let i = 0; i < hintCount; i++) {
+    process.stdout.write('\x1B[1B\r\x1B[2K');       // cursor DOWN (no scroll) + col 0 + erase
+  }
+  process.stdout.write('\x1B[u');                   // restore cursor
+  hintCount = 0;
+}
+
+function renderHints(input: string): void {
+  clearHints();
+  if (!input.startsWith('/')) return;
+  const matches = SLASH_COMMANDS.filter(c => c.cmd.startsWith(input));
+  if (matches.length === 0) return;
+
+  const n = matches.length;
+  // Print blank lines to guarantee rows exist below (scrolls if at bottom).
+  // On Windows, \n = CR+LF, so the column resets to 0 after each newline.
+  process.stdout.write('\n'.repeat(n));
+  // Go back up to the prompt row (cursor is now at col 0 due to Windows CR+LF).
+  process.stdout.write(`\x1B[${n}A`);
+  // Advance to the column where the cursor actually is (after "> " + typed input).
+  const col = PROMPT_LEN + input.length;
+  if (col > 0) process.stdout.write(`\x1B[${col}C`);
+  // Save the correct cursor position.
+  process.stdout.write('\x1B[s');
+  // Draw each hint on the rows we just created.
+  for (const m of matches) {
+    process.stdout.write('\x1B[1B\r\x1B[2K');
+    process.stdout.write(chalk.cyan(m.cmd.padEnd(12)) + chalk.gray(m.desc));
+  }
+  // Return cursor to the input line.
+  process.stdout.write('\x1B[u');
+  hintCount = n;
+}
+
 async function main(): Promise<void> {
   const program = new Command();
 
@@ -50,7 +98,7 @@ async function main(): Promise<void> {
   console.log(chalk.cyan('\nAgenticAI — TypeScript CLI Agent'));
   console.log(chalk.gray(`Model: ${config.model}  |  URL: ${config.baseUrl}`));
   console.log(chalk.gray(`Skills: ${getSkillNames().join(', ')}`));
-  console.log(chalk.gray('Commands: exit, /clear, /history\n'));
+  console.log(chalk.gray('Type / to see commands\n'));
 
   console.log(chalk.yellow('Connecting to Ollama...'));
   await checkOllamaConnection(client);
@@ -60,13 +108,34 @@ async function main(): Promise<void> {
     { role: 'system', content: SYSTEM_PROMPT },
   ];
 
+  // Tab completion for slash commands
+  const completer = (line: string): [string[], string] => {
+    const hits = SLASH_COMMANDS.map(c => c.cmd).filter(c => c.startsWith(line));
+    return [hits, line];
+  };
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
+    completer,
+  });
+
+  // Show/update hints on every keypress when input starts with "/"
+  readline.emitKeypressEvents(process.stdin, rl);
+  process.stdin.on('keypress', () => {
+    // 1. Clear old hints NOW (readline redraws its line before our listener fires,
+    //    so hints from the previous keypress are already orphaned on screen).
+    clearHints();
+    // 2. After readline finishes updating rl.line, draw fresh hints.
+    setImmediate(() => {
+      const line = (rl as unknown as { line: string }).line ?? '';
+      renderHints(line);
+    });
   });
 
   const prompt = (): void => {
-    rl.question(chalk.blue('You: '), async (input: string) => {
+    rl.question(chalk.blue('> '), async (input: string) => {
+      clearHints(); // remove hint lines before printing anything
       const trimmed = input.trim();
 
       if (!trimmed) {
@@ -80,34 +149,43 @@ async function main(): Promise<void> {
         return;
       }
 
+      if (trimmed === '/help') {
+        console.log(chalk.cyan('\nAvailable commands:'));
+        for (const c of SLASH_COMMANDS) {
+          console.log(`  ${chalk.cyan(c.cmd.padEnd(12))} ${chalk.gray(c.desc)}`);
+        }
+        console.log(chalk.gray(`  ${'exit'.padEnd(12)} Quit the program\n`));
+        prompt();
+        return;
+      }
+
       if (trimmed === '/clear') {
-        // Keep system prompt, reset the rest
-        history.splice(1);
+        history.splice(1); // keep system prompt, reset the rest
         console.log(chalk.gray('Conversation history cleared.\n'));
         prompt();
         return;
       }
 
       if (trimmed === '/history') {
-        const userMsgs = history.filter((m) => m.role === 'user' || m.role === 'assistant').length;
-        console.log(chalk.gray(`Message history: ${userMsgs} messages (${history.length} total including system/tool).\n`));
+        const turns = history.filter(m => m.role === 'user' || m.role === 'assistant').length;
+        console.log(chalk.gray(`Message history: ${turns} messages (${history.length} total).\n`));
         prompt();
         return;
       }
 
       try {
-        const CLEAR = ' '.repeat(60) + '\r';
+        const CLEAR_LINE = ' '.repeat(60) + '\r';
         process.stdout.write(chalk.gray('Thinking...\r'));
 
         const response = await runAgentTurn(
           client, config, history, trimmed,
           (msg) => {
-            process.stdout.write(CLEAR);
+            process.stdout.write(CLEAR_LINE);
             console.log(chalk.dim(`  > ${msg}`));
           }
         );
 
-        process.stdout.write(CLEAR);
+        process.stdout.write(CLEAR_LINE);
         console.log(chalk.green('AI: ') + response + '\n');
       } catch (err) {
         process.stdout.write(' '.repeat(60) + '\r');
