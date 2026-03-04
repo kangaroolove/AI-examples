@@ -1,5 +1,6 @@
 import type { Skill, OpenAITool } from '../types';
 import { openNotepadSkill, writeNotepadSkill, saveNotepadSkill, readNotepadSkill } from './notepad';
+import { readFileSkill } from './readFile';
 
 // To add a new skill: create src/skills/myskill.ts, export a Skill,
 // import it here, and push it to SKILL_REGISTRY.
@@ -8,6 +9,7 @@ const SKILL_REGISTRY: Skill[] = [
   writeNotepadSkill,
   saveNotepadSkill,
   readNotepadSkill,
+  readFileSkill,
 ];
 
 export function getOpenAITools(): OpenAITool[] {

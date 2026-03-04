@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import type { CLIConfig, MessageHistory } from './types';
 import { planTask, executeWorkflow } from './workflow';
+import { getOpenAITools, executeSkill } from './skills/index';
 
 const NOTEPAD_KEYWORD = /notepad/i;
 
@@ -60,15 +61,40 @@ export async function runAgentTurn(
     return finalResponse;
   }
 
-  // ── Plain chat path ──────────────────────────────────────────────────────
-  const response = await client.chat.completions.create({
-    model: config.model,
-    messages: history,
-    temperature: config.temperature,
-  });
+  // ── Plain chat path (with tool-call support) ─────────────────────────────
+  const tools = getOpenAITools();
 
-  const assistantMessage = response.choices[0]?.message;
-  if (!assistantMessage) throw new Error('No response from model');
-  history.push(assistantMessage);
-  return assistantMessage.content ?? '';
+  // Agentic loop: keep going until the model stops calling tools
+  for (;;) {
+    const response = await client.chat.completions.create({
+      model: config.model,
+      messages: history,
+      temperature: config.temperature,
+      tools,
+      tool_choice: 'auto',
+    });
+
+    const assistantMessage = response.choices[0]?.message;
+    if (!assistantMessage) throw new Error('No response from model');
+    history.push(assistantMessage);
+
+    const toolCalls = assistantMessage.tool_calls;
+    if (!toolCalls || toolCalls.length === 0) {
+      // No tool calls — plain text response
+      return assistantMessage.content ?? '';
+    }
+
+    // Execute each tool call and feed results back
+    for (const call of toolCalls) {
+      let args: Record<string, unknown> = {};
+      try { args = JSON.parse(call.function.arguments); } catch { /* leave empty */ }
+      const result = await executeSkill(call.function.name, args);
+      history.push({
+        role: 'tool',
+        tool_call_id: call.id,
+        content: result,
+      });
+    }
+    // Loop back so the model can produce a final response after seeing tool results
+  }
 }
