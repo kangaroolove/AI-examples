@@ -12,8 +12,19 @@ const SKILL_REGISTRY: Skill[] = [
   readFileSkill,
 ];
 
+// Dynamic skills registered at runtime (e.g. from MCP servers)
+let dynamicSkills: Skill[] = [];
+
+export function registerDynamicSkills(skills: Skill[]): void {
+  dynamicSkills = skills;
+}
+
+function allSkills(): Skill[] {
+  return [...SKILL_REGISTRY, ...dynamicSkills];
+}
+
 export function getOpenAITools(): OpenAITool[] {
-  return SKILL_REGISTRY.map((skill) => ({
+  return allSkills().map((skill) => ({
     type: 'function' as const,
     function: {
       name: skill.name,
@@ -24,11 +35,11 @@ export function getOpenAITools(): OpenAITool[] {
 }
 
 export function getSkillNames(): string[] {
-  return SKILL_REGISTRY.map((s) => s.name);
+  return allSkills().map((s) => s.name);
 }
 
 export function getSkillDescriptions(): string {
-  return SKILL_REGISTRY.map((skill) => {
+  return allSkills().map((skill) => {
     const props = skill.parameters.properties;
     const params = Object.entries(props)
       .map(([k, v]) => {
@@ -41,7 +52,7 @@ export function getSkillDescriptions(): string {
 }
 
 export async function executeSkill(name: string, args: Record<string, unknown>): Promise<string> {
-  const skill = SKILL_REGISTRY.find((s) => s.name === name);
+  const skill = allSkills().find((s) => s.name === name);
   if (!skill) {
     return JSON.stringify({ success: false, output: '', error: `Unknown skill: ${name}` });
   }

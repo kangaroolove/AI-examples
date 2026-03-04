@@ -3,10 +3,22 @@ import * as readline from 'readline';
 import chalk from 'chalk';
 import { createClient } from './client';
 import { checkOllamaConnection, runAgentTurn } from './agent';
-import { getSkillNames } from './skills/index';
+import { getSkillNames, registerDynamicSkills } from './skills/index';
+import { initMCPServers, getMCPConfigPath } from './mcp';
 import type { CLIConfig, MessageHistory } from './types';
 
-const SYSTEM_PROMPT = `You are a helpful AI assistant. Always reply directly in this chat.
+function buildSystemPrompt(extraToolNames: string[]): string {
+  const builtinSkills = [
+    '- open_notepad: Open Notepad with optional content',
+    '- write_notepad: Write content to Notepad',
+    '- save_notepad: Save Notepad (Ctrl+S)',
+    '- read_notepad: Read Notepad content',
+    '- read_file(file_path): Read and return the contents of any file at the given path',
+  ];
+  const mcpSkills = extraToolNames.map((n) => `- ${n}`);
+  const allSkills = [...builtinSkills, ...mcpSkills].join('\n');
+
+  return `You are a helpful AI assistant. Always reply directly in this chat.
 
 CRITICAL RULES — follow these without exception:
 1. For greetings, questions, and general conversation, respond with plain text only. Do NOT call any tool.
@@ -14,11 +26,8 @@ CRITICAL RULES — follow these without exception:
 3. When the user asks to read a file (e.g. "read file X", "show me the contents of X"), call the read_file tool with the given path.
 
 Available skills (only invoke when explicitly asked):
-- open_notepad: Open Notepad with optional content
-- write_notepad: Write content to Notepad
-- save_notepad: Save Notepad (Ctrl+S)
-- read_notepad: Read Notepad content
-- read_file(file_path): Read and return the contents of any file at the given path`;
+${allSkills}`;
+}
 
 // ── Slash command registry ────────────────────────────────────────────────────
 const SLASH_COMMANDS = [
@@ -101,12 +110,41 @@ async function main(): Promise<void> {
   console.log(chalk.gray(`Skills: ${getSkillNames().join(', ')}`));
   console.log(chalk.gray('Type / to see commands\n'));
 
+  // ── Load MCP servers ────────────────────────────────────────────────────────
+  console.log(chalk.yellow(`Loading MCP servers from ${getMCPConfigPath()}...`));
+  console.log(chalk.gray('(First run may take a moment if npx needs to download packages)'));
+  const { statuses, skills: mcpSkills } = await initMCPServers();
+
+  if (statuses.length === 0) {
+    console.log(chalk.gray('MCP: no servers configured.\n'));
+  } else {
+    console.log(chalk.cyan('MCP Servers:'));
+    for (const s of statuses) {
+      if (s.status === 'connected') {
+        const toolList = s.tools.length > 0 ? s.tools.join(', ') : '(no tools)';
+        console.log(`  ${chalk.green('✓')} ${chalk.white(s.name.padEnd(16))} ${chalk.gray(toolList)}`);
+      } else if (s.status === 'disabled') {
+        console.log(`  ${chalk.gray('-')} ${chalk.gray(s.name.padEnd(16))} disabled`);
+      } else {
+        console.log(`  ${chalk.red('✗')} ${chalk.white(s.name.padEnd(16))} ${chalk.red(s.error ?? 'failed')}`);
+      }
+    }
+    console.log('');
+  }
+
+  if (mcpSkills.length > 0) {
+    registerDynamicSkills(mcpSkills);
+    console.log(chalk.gray(`MCP tools available: ${mcpSkills.map((s) => s.name).join(', ')}\n`));
+  }
+
+  // ── Connect to Ollama ───────────────────────────────────────────────────────
   console.log(chalk.yellow('Connecting to Ollama...'));
   await checkOllamaConnection(client);
   console.log(chalk.green('Connected.\n'));
 
+  const mcpToolNames = mcpSkills.map((s) => s.name);
   const history: MessageHistory = [
-    { role: 'system', content: SYSTEM_PROMPT },
+    { role: 'system', content: buildSystemPrompt(mcpToolNames) },
   ];
 
   // Tab completion for slash commands
